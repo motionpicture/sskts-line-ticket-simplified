@@ -112,10 +112,9 @@ exports.startIndexingFace = startIndexingFace;
  */
 function askConfirmationOfFriendPay(user, friendPayToken) {
     return __awaiter(this, void 0, void 0, function* () {
-        const friendPayInfo = yield user.verifyFriendPayToken(friendPayToken);
+        const gmoShopId = 'tshop00026096';
         const callback = `https://${user.host}/transactions/payment/friendPay/${friendPayToken}?userId=${user.userId}`;
-        // tslint:disable-next-line:max-line-length
-        const creditCardUrl = `https://${user.host}/transactions/${friendPayInfo.transactionId}/inputCreditCard?cb=${encodeURIComponent(callback)}`;
+        const creditCardUrl = `https://${user.host}/transactions/inputCreditCard?cb=${encodeURIComponent(callback)}&gmoShopId=${gmoShopId}`;
         yield request.post({
             simple: false,
             url: 'https://api.line.me/v2/bot/message/push',

@@ -257,7 +257,10 @@ function createTmpReservation(user, eventIdentifier) {
         const message = encodeURIComponent(`僕の代わりに決済をお願いできますか？よければ、下のリンクを押してそのままメッセージを送信してください。
 line://oaMessage/${LINE_ID}/?${friendMessage}`);
         const friendPayUrl = `line://msg/text/?${message}`;
-        const creditCardUrl = `https://${user.host}/transactions/${transaction.id}/inputCreditCard?userId=${user.userId}`;
+        const gmoShopId = 'tshop00026096';
+        const creditCardCallback = `https://${user.host}/transactions/${transaction.id}/inputCreditCard?userId=${user.userId}`;
+        // tslint:disable-next-line:max-line-length
+        const creditCardUrl = `https://${user.host}/transactions/inputCreditCard?cb=${encodeURIComponent(creditCardCallback)}&gmoShopId=${gmoShopId}`;
         yield request.post({
             simple: false,
             url: 'https://api.line.me/v2/bot/message/push',

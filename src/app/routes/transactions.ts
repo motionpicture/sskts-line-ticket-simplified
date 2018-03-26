@@ -12,15 +12,16 @@ import User from '../user';
 const transactionsRouter = express.Router();
 const debug = createDebug('sskts-line-ticket-simplified:router:transactions');
 
+/**
+ * クレジットカード情報入力フォーム
+ */
 transactionsRouter.get(
-    '/transactions/:transactionId/inputCreditCard',
+    '/transactions/inputCreditCard',
     async (req, res, next) => {
         try {
-            const gmoShopId = 'tshop00026096';
-
             // フォーム
             res.render('transactions/inputCreditCard', {
-                gmoShopId: gmoShopId,
+                gmoShopId: req.query.gmoShopId,
                 cb: req.query.cb // フォームのPOST先
             });
         } catch (error) {

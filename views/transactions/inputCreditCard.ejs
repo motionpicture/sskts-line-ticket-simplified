@@ -9,101 +9,74 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
     <script src="https://pt01.mul-pay.jp/ext/js/token.js"></script>
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+        crossorigin="anonymous">
 </head>
 
 <body>
     <div class="container">
         <h1>クレジットカード情報入力</h1>
 
-        <form id="form_profile" method="post" action="<%= cb %>">
-            <table class="table table-profile table-profile-customer">
-                <tbody>
-                    <tr class="tr-price">
-                        <th>
-                            <label>TotalPrice</label>
-                        </th>
-                        <td>
-                            <p>
-                                <span class="price"></span>
-                            </p>
-                        </td>
-                    </tr>
-                    <tr class="tr-cardNumber">
-                        <th>
-                            <label for="cardNumber">CardNumber</label>
-                        </th>
-                        <td>
-                            <input type="tel" name="cardNumber" id="cardNumber" class="form-control input-required" value="" maxlength="16" data-pattern="^[0-9]+$"
-                                data-fieldname="CardNumber" required>
-                        </td>
-                    </tr>
-                    <tr class="tr-holdername">
-                        <th>
-                            <label for="holdername">CardHoldername</label>
-                        </th>
-                        <td>
-                            <input type="text" name="holdername" id="holdername" class="form-control input-required" value="" data-fieldname="CardHoldername"
-                                required>
-                        </td>
-                    </tr>
-                    <tr class="tr-expire">
-                        <th>
-                            <label for="expire">CardExpire</label>
-                        </th>
-                        <td>
-                            <select name="cardExpirationMonth" id="cardExpirationMonth" class="form-control select-cardexpire" required="">
-                                <option value="">--</option>
-                                <option value="01">01</option>
-                                <option value="02">02</option>
-                                <option value="03">03</option>
-                                <option value="04">04</option>
-                                <option value="05">05</option>
-                                <option value="06">06</option>
-                                <option value="07">07</option>
-                                <option value="08">08</option>
-                                <option value="09">09</option>
-                                <option value="10">10</option>
-                                <option value="11">11</option>
-                                <option value="12">12</option>
-                            </select> 月
-                            <select name="cardExpirationYear" id="cardExpirationYear" class="form-control select-cardexpire" required="">
-                                <option value="">--</option>
-                                <option value="2018">2018</option>
-                                <option value="2019">2019</option>
-                                <option value="2020">2020</option>
-                                <option value="2021">2021</option>
-                                <option value="2022">2022</option>
-                                <option value="2023">2023</option>
-                                <option value="2024">2024</option>
-                                <option value="2025">2025</option>
-                                <option value="2026">2026</option>
-                                <option value="2027">2027</option>
-                            </select> 年
-                            <input type="hidden" name="expire" id="expire" value="" class="input-required" data-fieldname="カード有効期限" required="">
-                        </td>
-                    </tr>
-                    <tr class="tr-securitycode">
-                        <th>
-                            <label for="securitycode">Securitycode</label>
-                        </th>
-                        <td>
-                            <input type="tel" name="securitycode" id="securitycode" class="form-control input-required" value="" maxlength="4" data-pattern="^[0-9]+$"
-                                data-fieldname="Securitycode" required>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <form method="post" action="<%= cb %>">
+            <div class="form-group">
+                <label for="cardNumber">CardNumber</label>
+                <input type="tel" name="cardNumber" id="cardNumber" class="form-control input-required" value="" maxlength="16" data-pattern="^[0-9]+$"
+                    data-fieldname="CardNumber" required>
+            </div>
+            <div class="form-group">
+                <label for="holdername">CardHoldername</label>
+                <input type="text" name="holdername" id="holdername" class="form-control input-required" value="" data-fieldname="CardHoldername"
+                    required>
+            </div>
+            <div class="form-group">
+
+                <label for="expire">CardExpire</label>
+
+                <select name="cardExpirationMonth" id="cardExpirationMonth" class="form-control select-cardexpire" required="">
+                    <option value="">--</option>
+                    <option value="01">01</option>
+                    <option value="02">02</option>
+                    <option value="03">03</option>
+                    <option value="04">04</option>
+                    <option value="05">05</option>
+                    <option value="06">06</option>
+                    <option value="07">07</option>
+                    <option value="08">08</option>
+                    <option value="09">09</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                </select> 月
+                <select name="cardExpirationYear" id="cardExpirationYear" class="form-control select-cardexpire" required="">
+                    <option value="">--</option>
+                    <option value="2018">2018</option>
+                    <option value="2019">2019</option>
+                    <option value="2020">2020</option>
+                    <option value="2021">2021</option>
+                    <option value="2022">2022</option>
+                    <option value="2023">2023</option>
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                </select> 年
+                <input type="hidden" name="expire" id="expire" value="" class="input-required" data-fieldname="カード有効期限" required="">
+
+            </div>
+            <div class="form-group">
+                <label for="securitycode">Securitycode</label>
+                <input type="tel" name="securitycode" id="securitycode" class="form-control input-required" value="" maxlength="4" data-pattern="^[0-9]+$"
+                    data-fieldname="Securitycode" required>
+            </div>
 
             <input type="hidden" name="token" value="">
-        </form>
 
-        <div class="navbtns">
-            <a class="btn btn-next" href="javascript:void(0);">
+            <a class="btn btn-primary btn-next" href="javascript:void(0);">
                 <span>Next</span>
             </a>
-        </div>
+        </form>
     </div>
-
 </body>
 
 <script>

@@ -269,7 +269,10 @@ export async function createTmpReservation(user: User, eventIdentifier: string) 
 line://oaMessage/${LINE_ID}/?${friendMessage}`);
     const friendPayUrl = `line://msg/text/?${message}`;
 
-    const creditCardUrl = `https://${user.host}/transactions/${transaction.id}/inputCreditCard?userId=${user.userId}`;
+    const gmoShopId = 'tshop00026096';
+    const creditCardCallback = `https://${user.host}/transactions/${transaction.id}/inputCreditCard?userId=${user.userId}`;
+    // tslint:disable-next-line:max-line-length
+    const creditCardUrl = `https://${user.host}/transactions/inputCreditCard?cb=${encodeURIComponent(creditCardCallback)}&gmoShopId=${gmoShopId}`;
 
     await request.post({
         simple: false,

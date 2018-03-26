@@ -100,11 +100,9 @@ export async function startIndexingFace(userId: string) {
  * 友達決済承認確認
  */
 export async function askConfirmationOfFriendPay(user: User, friendPayToken: string) {
-    const friendPayInfo = await user.verifyFriendPayToken(friendPayToken);
-
+    const gmoShopId = 'tshop00026096';
     const callback = `https://${user.host}/transactions/payment/friendPay/${friendPayToken}?userId=${user.userId}`;
-    // tslint:disable-next-line:max-line-length
-    const creditCardUrl = `https://${user.host}/transactions/${friendPayInfo.transactionId}/inputCreditCard?cb=${encodeURIComponent(callback)}`;
+    const creditCardUrl = `https://${user.host}/transactions/inputCreditCard?cb=${encodeURIComponent(callback)}&gmoShopId=${gmoShopId}`;
 
     await request.post({
         simple: false,

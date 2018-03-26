@@ -18,12 +18,14 @@ const PostbackController = require("../controllers/webhook/postback");
 const user_1 = require("../user");
 const transactionsRouter = express.Router();
 const debug = createDebug('sskts-line-ticket-simplified:router:transactions');
-transactionsRouter.get('/transactions/:transactionId/inputCreditCard', (req, res, next) => __awaiter(this, void 0, void 0, function* () {
+/**
+ * クレジットカード情報入力フォーム
+ */
+transactionsRouter.get('/transactions/inputCreditCard', (req, res, next) => __awaiter(this, void 0, void 0, function* () {
     try {
-        const gmoShopId = 'tshop00026096';
         // フォーム
         res.render('transactions/inputCreditCard', {
-            gmoShopId: gmoShopId,
+            gmoShopId: req.query.gmoShopId,
             cb: req.query.cb // フォームのPOST先
         });
     }
