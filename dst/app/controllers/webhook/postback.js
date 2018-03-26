@@ -256,6 +256,8 @@ function createTmpReservation(user, eventIdentifier) {
         const friendMessage = `FriendPayToken.${token}`;
         const message = encodeURIComponent(`僕の代わりに決済をお願いできますか？よければ、下のリンクを押してそのままメッセージを送信してください。
 line://oaMessage/${LINE_ID}/?${friendMessage}`);
+        const friendPayUrl = `line://msg/text/?${message}`;
+        const creditCardUrl = `https://${user.host}/transactions/${transaction.id}/inputCreditCard?userId=${user.userId}`;
         yield request.post({
             simple: false,
             url: 'https://api.line.me/v2/bot/message/push',
@@ -273,6 +275,11 @@ line://oaMessage/${LINE_ID}/?${friendMessage}`);
                             text: '決済方法を選択してください。Friend Payの場合、ボタンを押して友達を選択してください。',
                             actions: [
                                 {
+                                    type: 'uri',
+                                    label: 'Credit Card',
+                                    uri: creditCardUrl
+                                },
+                                {
                                     type: 'postback',
                                     label: 'Pecorino',
                                     data: `action=choosePaymentMethod&paymentMethod=Pecorino&transactionId=${transaction.id}`
@@ -280,7 +287,7 @@ line://oaMessage/${LINE_ID}/?${friendMessage}`);
                                 {
                                     type: 'uri',
                                     label: 'Friend Pay',
-                                    uri: `line://msg/text/?${message}`
+                                    uri: friendPayUrl
                                 }
                             ]
                         }
@@ -292,44 +299,49 @@ line://oaMessage/${LINE_ID}/?${friendMessage}`);
 }
 exports.createTmpReservation = createTmpReservation;
 // tslint:disable-next-line:max-func-body-length
-function choosePaymentMethod(user, paymentMethod, transactionId, friendPayPrice) {
+function choosePaymentMethod(params) {
     return __awaiter(this, void 0, void 0, function* () {
         const placeOrderService = new ssktsapi.service.transaction.PlaceOrder({
             endpoint: process.env.API_ENDPOINT,
-            auth: user.authClient
+            auth: params.user.authClient
         });
         let price;
-        if (paymentMethod === 'Pecorino') {
-            debug('checking balance...', paymentMethod, transactionId);
-            yield LINE.pushMessage(user.userId, '残高を確認しています...');
-            const actionRepo = new sskts.repository.Action(sskts.mongoose.connection);
-            let seatReservations = yield actionRepo.findAuthorizeByTransactionId(transactionId);
-            seatReservations = seatReservations
-                .filter((a) => a.actionStatus === ssktsapi.factory.actionStatusType.CompletedActionStatus)
-                .filter((a) => a.object.typeOf === ssktsapi.factory.action.authorize.seatReservation.ObjectType.SeatReservation);
-            price = seatReservations[0].result.price;
-            const orderIdPrefix = util.format('%s%s%s', moment().format('YYYYMMDD'), '999', 
-            // tslint:disable-next-line:no-magic-numbers
-            `00000000${seatReservations[0].result.updTmpReserveSeatResult.tmpReserveNum}`.slice(-8));
-            const creditCardAuthorizeAction = yield placeOrderService.createCreditCardAuthorization({
-                transactionId: transactionId,
-                orderId: `${orderIdPrefix}01`,
-                amount: price,
-                method: sskts.GMO.utils.util.Method.Lump,
-                creditCard: {
-                    cardNo: '4111111111111111',
-                    expire: '2012',
-                    holderName: 'AA BB'
+        switch (params.paymentMethod) {
+            case 'Pecorino':
+                debug('checking balance...', params.paymentMethod, params.transactionId);
+                throw new Error('Pecorino account not found.');
+            case 'CreditCard':
+                const token = params.creditCardToken;
+                if (token === undefined) {
+                    throw new Error('Credit card token not found.');
                 }
-            });
-            debug('creditCardAuthorizeAction:', creditCardAuthorizeAction);
-            yield LINE.pushMessage(user.userId, 'クレジットカードのオーソリを取得しました。');
-        }
-        else if (paymentMethod === 'FriendPay') {
-            price = friendPayPrice;
-        }
-        else {
-            throw new Error(`Unknown payment method ${paymentMethod}`);
+                yield LINE.pushMessage(params.user.userId, 'オーソリを取得しています...');
+                const actionRepo = new sskts.repository.Action(sskts.mongoose.connection);
+                let seatReservations = yield actionRepo.findAuthorizeByTransactionId(params.transactionId);
+                seatReservations = seatReservations
+                    .filter((a) => a.actionStatus === ssktsapi.factory.actionStatusType.CompletedActionStatus)
+                    .filter((a) => a.object.typeOf === ssktsapi.factory.action.authorize.seatReservation.ObjectType.SeatReservation);
+                price = seatReservations[0].result.price;
+                const orderIdPrefix = util.format('%s%s%s', moment().format('YYYYMMDD'), '999', 
+                // tslint:disable-next-line:no-magic-numbers
+                `00000000${seatReservations[0].result.updTmpReserveSeatResult.tmpReserveNum}`.slice(-8));
+                const creditCardAuthorizeAction = yield placeOrderService.createCreditCardAuthorization({
+                    transactionId: params.transactionId,
+                    orderId: `${orderIdPrefix}01`,
+                    amount: price,
+                    method: sskts.GMO.utils.util.Method.Lump,
+                    creditCard: { token }
+                });
+                debug('creditCardAuthorizeAction:', creditCardAuthorizeAction);
+                yield LINE.pushMessage(params.user.userId, 'クレジットカードのオーソリを取得しました。');
+                break;
+            case 'FriendPay':
+                if (params.friendPayPrice === undefined) {
+                    throw new Error('friendPayPrice undefined.');
+                }
+                price = params.friendPayPrice;
+            default:
+                throw new Error(`Unknown payment method ${params.paymentMethod}`);
         }
         const contact = {
             givenName: 'たろう',
@@ -338,11 +350,11 @@ function choosePaymentMethod(user, paymentMethod, transactionId, friendPayPrice)
             email: 'hello@motionpicture.jp'
         };
         yield placeOrderService.setCustomerContact({
-            transactionId: transactionId,
+            transactionId: params.transactionId,
             contact: contact
         });
         debug('customer contact set.');
-        yield LINE.pushMessage(user.userId, `以下の通り注文を受け付けようとしています...
+        yield LINE.pushMessage(params.user.userId, `以下の通り注文を受け付けようとしています...
 ------------
 購入者情報
 ------------
@@ -353,7 +365,7 @@ ${contact.telephone}
 ------------
 決済方法
 ------------
-${paymentMethod}
+${params.paymentMethod}
 ${price} JPY
 `);
         // 注文内容確認
@@ -363,7 +375,7 @@ ${price} JPY
             auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
             json: true,
             body: {
-                to: user.userId,
+                to: params.user.userId,
                 messages: [
                     {
                         type: 'template',
@@ -375,12 +387,12 @@ ${price} JPY
                                 {
                                     type: 'postback',
                                     label: 'Yes',
-                                    data: `action=confirmOrder&transactionId=${transactionId}`
+                                    data: `action=confirmOrder&transactionId=${params.transactionId}`
                                 },
                                 {
                                     type: 'postback',
                                     label: 'No',
-                                    data: `action=cancelOrder&transactionId=${transactionId}`
+                                    data: `action=cancelOrder&transactionId=${params.transactionId}`
                                 }
                             ]
                         }

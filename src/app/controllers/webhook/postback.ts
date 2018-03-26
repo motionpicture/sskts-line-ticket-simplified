@@ -267,6 +267,9 @@ export async function createTmpReservation(user: User, eventIdentifier: string) 
     const friendMessage = `FriendPayToken.${token}`;
     const message = encodeURIComponent(`僕の代わりに決済をお願いできますか？よければ、下のリンクを押してそのままメッセージを送信してください。
 line://oaMessage/${LINE_ID}/?${friendMessage}`);
+    const friendPayUrl = `line://msg/text/?${message}`;
+
+    const creditCardUrl = `https://${user.host}/transactions/${transaction.id}/inputCreditCard?userId=${user.userId}`;
 
     await request.post({
         simple: false,
@@ -285,6 +288,11 @@ line://oaMessage/${LINE_ID}/?${friendMessage}`);
                         text: '決済方法を選択してください。Friend Payの場合、ボタンを押して友達を選択してください。',
                         actions: [
                             {
+                                type: 'uri',
+                                label: 'Credit Card',
+                                uri: creditCardUrl
+                            },
+                            {
                                 type: 'postback',
                                 label: 'Pecorino',
                                 data: `action=choosePaymentMethod&paymentMethod=Pecorino&transactionId=${transaction.id}`
@@ -292,7 +300,7 @@ line://oaMessage/${LINE_ID}/?${friendMessage}`);
                             {
                                 type: 'uri',
                                 label: 'Friend Pay',
-                                uri: `line://msg/text/?${message}`
+                                uri: friendPayUrl
                             }
                         ]
                     }
@@ -302,53 +310,71 @@ line://oaMessage/${LINE_ID}/?${friendMessage}`);
     }).promise();
 }
 
-export type PaymentMethodType = 'Pecorino' | 'FriendPay';
+export type PaymentMethodType = 'CreditCard' | 'Pecorino' | 'FriendPay';
 
 // tslint:disable-next-line:max-func-body-length
-export async function choosePaymentMethod(user: User, paymentMethod: PaymentMethodType, transactionId: string, friendPayPrice: number) {
+export async function choosePaymentMethod(params: {
+    user: User;
+    paymentMethod: PaymentMethodType;
+    transactionId: string;
+    friendPayPrice?: number;
+    creditCardToken?: string;
+}) {
     const placeOrderService = new ssktsapi.service.transaction.PlaceOrder({
         endpoint: <string>process.env.API_ENDPOINT,
-        auth: user.authClient
+        auth: params.user.authClient
     });
 
     let price: number;
 
-    if (paymentMethod === 'Pecorino') {
-        debug('checking balance...', paymentMethod, transactionId);
-        await LINE.pushMessage(user.userId, '残高を確認しています...');
+    switch (params.paymentMethod) {
+        case 'Pecorino':
+            debug('checking balance...', params.paymentMethod, params.transactionId);
+            throw new Error('Pecorino account not found.');
 
-        const actionRepo = new sskts.repository.Action(sskts.mongoose.connection);
-        let seatReservations = await actionRepo.findAuthorizeByTransactionId(transactionId);
-        seatReservations = seatReservations
-            .filter((a) => a.actionStatus === ssktsapi.factory.actionStatusType.CompletedActionStatus)
-            .filter((a) => a.object.typeOf === ssktsapi.factory.action.authorize.seatReservation.ObjectType.SeatReservation);
-        price = seatReservations[0].result.price;
-
-        const orderIdPrefix = util.format(
-            '%s%s%s',
-            moment().format('YYYYMMDD'),
-            '999',
-            // tslint:disable-next-line:no-magic-numbers
-            `00000000${seatReservations[0].result.updTmpReserveSeatResult.tmpReserveNum}`.slice(-8)
-        );
-
-        const creditCardAuthorizeAction = await placeOrderService.createCreditCardAuthorization({
-            transactionId: transactionId,
-            orderId: `${orderIdPrefix}01`,
-            amount: price,
-            method: sskts.GMO.utils.util.Method.Lump,
-            creditCard: {
-                cardNo: '4111111111111111',
-                expire: '2012',
-                holderName: 'AA BB'
+        case 'CreditCard':
+            const token = params.creditCardToken;
+            if (token === undefined) {
+                throw new Error('Credit card token not found.');
             }
-        });
-        debug('creditCardAuthorizeAction:', creditCardAuthorizeAction);
-        await LINE.pushMessage(user.userId, 'クレジットカードのオーソリを取得しました。');
-    } else if (paymentMethod === 'FriendPay') {
-        price = friendPayPrice;
-    } else {
-        throw new Error(`Unknown payment method ${paymentMethod}`);
+
+            await LINE.pushMessage(params.user.userId, 'オーソリを取得しています...');
+
+            const actionRepo = new sskts.repository.Action(sskts.mongoose.connection);
+            let seatReservations = await actionRepo.findAuthorizeByTransactionId(params.transactionId);
+            seatReservations = seatReservations
+                .filter((a) => a.actionStatus === ssktsapi.factory.actionStatusType.CompletedActionStatus)
+                .filter((a) => a.object.typeOf === ssktsapi.factory.action.authorize.seatReservation.ObjectType.SeatReservation);
+            price = seatReservations[0].result.price;
+
+            const orderIdPrefix = util.format(
+                '%s%s%s',
+                moment().format('YYYYMMDD'),
+                '999',
+                // tslint:disable-next-line:no-magic-numbers
+                `00000000${seatReservations[0].result.updTmpReserveSeatResult.tmpReserveNum}`.slice(-8)
+            );
+
+            const creditCardAuthorizeAction = await placeOrderService.createCreditCardAuthorization({
+                transactionId: params.transactionId,
+                orderId: `${orderIdPrefix}01`,
+                amount: price,
+                method: sskts.GMO.utils.util.Method.Lump,
+                creditCard: { token }
+            });
+            debug('creditCardAuthorizeAction:', creditCardAuthorizeAction);
+            await LINE.pushMessage(params.user.userId, 'クレジットカードのオーソリを取得しました。');
+            break;
+
+        case 'FriendPay':
+            if (params.friendPayPrice === undefined) {
+                throw new Error('friendPayPrice undefined.');
+            }
+
+            price = params.friendPayPrice;
+
+        default:
+            throw new Error(`Unknown payment method ${params.paymentMethod}`);
     }
 
     const contact = {
@@ -358,11 +384,11 @@ export async function choosePaymentMethod(user: User, paymentMethod: PaymentMeth
         email: 'hello@motionpicture.jp'
     };
     await placeOrderService.setCustomerContact({
-        transactionId: transactionId,
+        transactionId: params.transactionId,
         contact: contact
     });
     debug('customer contact set.');
-    await LINE.pushMessage(user.userId, `以下の通り注文を受け付けようとしています...
+    await LINE.pushMessage(params.user.userId, `以下の通り注文を受け付けようとしています...
 ------------
 購入者情報
 ------------
@@ -373,7 +399,7 @@ ${contact.telephone}
 ------------
 決済方法
 ------------
-${paymentMethod}
+${params.paymentMethod}
 ${price} JPY
 `);
 
@@ -384,7 +410,7 @@ ${price} JPY
         auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
         json: true,
         body: {
-            to: user.userId,
+            to: params.user.userId,
             messages: [
                 {
                     type: 'template',
@@ -396,12 +422,12 @@ ${price} JPY
                             {
                                 type: 'postback',
                                 label: 'Yes',
-                                data: `action=confirmOrder&transactionId=${transactionId}`
+                                data: `action=confirmOrder&transactionId=${params.transactionId}`
                             },
                             {
                                 type: 'postback',
                                 label: 'No',
-                                data: `action=cancelOrder&transactionId=${transactionId}`
+                                data: `action=cancelOrder&transactionId=${params.transactionId}`
                             }
                         ]
                     }

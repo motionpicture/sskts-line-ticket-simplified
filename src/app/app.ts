@@ -15,8 +15,8 @@ import mongooseConnectionOptions from '../mongooseConnectionOptions';
 const app = express();
 
 // view engine setup
-// app.set('views', `${__dirname}/views`);
-// app.set('view engine', 'ejs');
+app.set('views', `${__dirname}/../../views`);
+app.set('view engine', 'ejs');
 
 app.use(bodyParser.json());
 // The extended option allows to choose between parsing the URL-encoded data

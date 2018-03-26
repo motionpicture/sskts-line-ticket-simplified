@@ -115,8 +115,12 @@ export async function postback(event: LINE.IWebhookEvent, user: User) {
 
             // 決済方法選択
             case 'choosePaymentMethod':
-                await PostbackController.choosePaymentMethod(
-                    user, <PostbackController.PaymentMethodType>data.paymentMethod, <string>data.transactionId, 0);
+                await PostbackController.choosePaymentMethod({
+                    user: user,
+                    paymentMethod: <PostbackController.PaymentMethodType>data.paymentMethod,
+                    transactionId: <string>data.transactionId,
+                    friendPayPrice: 0
+                });
                 break;
 
             // 注文確定
@@ -126,8 +130,12 @@ export async function postback(event: LINE.IWebhookEvent, user: User) {
 
             // 友達決済承認確定
             case 'continueTransactionAfterFriendPayConfirmation':
-                await PostbackController.choosePaymentMethod(
-                    user, 'FriendPay', <string>data.transactionId, parseInt(<string>data.price, 10));
+                await PostbackController.choosePaymentMethod({
+                    user: user,
+                    paymentMethod: 'FriendPay',
+                    transactionId: <string>data.transactionId,
+                    friendPayPrice: parseInt(<string>data.price, 10)
+                });
                 break;
 
             default:

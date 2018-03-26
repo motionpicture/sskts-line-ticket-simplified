@@ -38,16 +38,6 @@ export async function pushHowToUse(userId: string) {
                             },
                             {
                                 type: 'message',
-                                label: '口座を確認する',
-                                text: '口座残高'
-                            },
-                            {
-                                type: 'message',
-                                label: 'おこづかいをもらう',
-                                text: 'おこづかい'
-                            },
-                            {
-                                type: 'message',
                                 label: '顔を登録する',
                                 text: '顔写真登録'
                             }

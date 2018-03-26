@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,user-scalable=no,maximum-scale=1">
+    <meta name="format-detection" content="telephone=no">
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+    <script src="https://pt01.mul-pay.jp/ext/js/token.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>クレジットカード情報入力</h1>
+
+        <form id="form_profile" method="post">
+            <table class="table table-profile table-profile-customer">
+                <tbody>
+                    <tr class="tr-price">
+                        <th>
+                            <label>TotalPrice</label>
+                        </th>
+                        <td>
+                            <p>
+                                <span class="price"></span>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="tr-cardNumber">
+                        <th>
+                            <label for="cardNumber">CardNumber</label>
+                        </th>
+                        <td>
+                            <input type="tel" name="cardNumber" id="cardNumber" class="form-control input-required" value="" maxlength="16" data-pattern="^[0-9]+$"
+                                data-fieldname="CardNumber" required>
+                        </td>
+                    </tr>
+                    <tr class="tr-holdername">
+                        <th>
+                            <label for="holdername">CardHoldername</label>
+                        </th>
+                        <td>
+                            <input type="text" name="holdername" id="holdername" class="form-control input-required" value="" data-fieldname="CardHoldername"
+                                required>
+                        </td>
+                    </tr>
+                    <tr class="tr-expire">
+                        <th>
+                            <label for="expire">CardExpire</label>
+                        </th>
+                        <td>
+                            <select name="cardExpirationMonth" id="cardExpirationMonth" class="form-control select-cardexpire" required="">
+                                <option value="">--</option>
+                                <option value="01">01</option>
+                                <option value="02">02</option>
+                                <option value="03">03</option>
+                                <option value="04">04</option>
+                                <option value="05">05</option>
+                                <option value="06">06</option>
+                                <option value="07">07</option>
+                                <option value="08">08</option>
+                                <option value="09">09</option>
+                                <option value="10">10</option>
+                                <option value="11">11</option>
+                                <option value="12">12</option>
+                            </select> 月
+                            <select name="cardExpirationYear" id="cardExpirationYear" class="form-control select-cardexpire" required="">
+                                <option value="">--</option>
+                                <option value="2018">2018</option>
+                                <option value="2019">2019</option>
+                                <option value="2020">2020</option>
+                                <option value="2021">2021</option>
+                                <option value="2022">2022</option>
+                                <option value="2023">2023</option>
+                                <option value="2024">2024</option>
+                                <option value="2025">2025</option>
+                                <option value="2026">2026</option>
+                                <option value="2027">2027</option>
+                            </select> 年
+                            <input type="hidden" name="expire" id="expire" value="" class="input-required" data-fieldname="カード有効期限" required="">
+                        </td>
+                    </tr>
+                    <tr class="tr-securitycode">
+                        <th>
+                            <label for="securitycode">Securitycode</label>
+                        </th>
+                        <td>
+                            <input type="tel" name="securitycode" id="securitycode" class="form-control input-required" value="" maxlength="4" data-pattern="^[0-9]+$"
+                                data-fieldname="Securitycode" required>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <input type="hidden" name="token" value="">
+        </form>
+
+        <div class="navbtns">
+            <a class="btn btn-next" href="javascript:void(0);">
+                <span>Next</span>
+            </a>
+        </div>
+    </div>
+
+</body>
+
+<script>
+    Multipayment.init('<%= gmoShopId %>');
+    var submitting = false;
+
+    /**
+     * トークン取得後イベント
+     * @function someCallbackFunction
+     * @param {Object} response
+     * @param {Object} response.tokenObject
+     * @param {number} response.resultCode
+     * @returns {void}
+     */
+    function someCallbackFunction(response) {
+        if (response.resultCode !== '000') {
+            $('.btn-next').removeClass('btn-disabled').find('span').text('Next');
+            submitting = false;
+            return alert('Credit card token error.');
+        }
+
+        // カード情報は念のため値を除去
+        $('input[name=cardNumber]').val('');
+        $('select[name=cardExpirationYear]').val('');
+        $('select[name=cardExpirationMonth]').val('');
+        $('input[name=securitycode]').val('');
+        $('input[name=holdername]').val('');
+
+        // 予め購入フォームに用意した token フィールドに、値を設定
+        $('input[name=token]').val(response.tokenObject.token);
+
+        // スクリプトからフォームを submit
+        $('form').submit();
+    }
+    /**
+     * トークン取得
+     * @function getToken
+     * @returns {void}
+     */
+    function getToken() {
+        var cardno = $('input[name=cardNumber]').val();
+        var expire = $('select[name=cardExpirationYear]').val() + $('select[name=cardExpirationMonth]').val();
+        var securitycode = $('input[name=securitycode]').val();
+        var holdername = $('input[name=holdername]').val();
+        var sendParam = {
+            cardno: cardno, // 加盟店様の購入フォームから取得したカード番号
+            expire: expire, // 加盟店様の購入フォームから取得したカード有効期限
+            securitycode: securitycode, // 加盟店様の購入フォームから取得したセキュリティコード
+            holdername: holdername // 加盟店様の購入フォームから取得したカード名義人
+        };
+        Multipayment.getToken(sendParam, someCallbackFunction);
+    }
+
+    $(function () {
+        // 送信
+        $('.btn-next').on('click', function () {
+            if (submitting) { return false; }
+            submitting = true;
+            $('.btn-next').addClass('btn-disabled').find('span').text('Sending...');
+            getToken();
+        });
+    });
+</script>
+
+</html>
