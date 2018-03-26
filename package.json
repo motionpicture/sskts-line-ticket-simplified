@@ -12,7 +12,7 @@
   "dependencies": {
     "@motionpicture/express-middleware": "^0.1.0",
     "@motionpicture/sskts-api-nodejs-client": "^3.0.0",
-    "@motionpicture/sskts-domain": "^24.0.2-alpha.0",
+    "@motionpicture/sskts-domain": "^24.1.0-alpha.5",
     "aws-sdk": "^2.199.0",
     "body-parser": "^1.18.2",
     "connect-redis": "^3.3.3",

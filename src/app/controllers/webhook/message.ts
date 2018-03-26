@@ -6,6 +6,7 @@
 import * as sskts from '@motionpicture/sskts-domain';
 import * as moment from 'moment';
 import * as request from 'request-promise-native';
+import * as util from 'util';
 
 import * as LINE from '../../../line';
 import User from '../../user';
@@ -178,6 +179,83 @@ export async function askReservationEventDate(userId: string, paymentNo: string)
  */
 export async function searchTickets(user: User) {
     await LINE.pushMessage(user.userId, '座席予約を検索しています...');
+
+    const orderRepo = new sskts.repository.Order(sskts.mongoose.connection);
+    const orders = await orderRepo.orderModel.find({
+        orderDate: { $gt: moment().add(-1, 'month').toDate() },
+        'customer.memberOf.membershipNumber': {
+            $exists: true,
+            $eq: 'U28fba84b4008d60291fc861e2562b34f'
+        },
+        'customer.memberOf.programName': {
+            $exists: true,
+            $eq: 'LINE'
+        }
+    }).exec().then((docs) => docs.map((doc) => <sskts.factory.order.IOrder>doc.toObject()));
+
+    await LINE.pushMessage(user.userId, `${orders.length}件の注文が見つかりました。`);
+
+    if (orders.length > 0) {
+        const itemsOffered: sskts.factory.order.IItemOffered[] = [];
+        orders.forEach((order) => {
+            itemsOffered.push(...order.acceptedOffers.map((o) => o.itemOffered));
+        });
+
+        await request.post({
+            simple: false,
+            url: 'https://api.line.me/v2/bot/message/push',
+            auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+            json: true,
+            body: {
+                to: user.userId,
+                messages: [
+                    {
+                        type: 'template',
+                        altText: '座席予約チケット',
+                        template: {
+                            type: 'carousel',
+                            columns: itemsOffered.map((itemOffered) => {
+                                // tslint:disable-next-line:max-line-length
+                                const qr = `https://chart.apis.google.com/chart?chs=300x300&cht=qr&chl=${itemOffered.reservedTicket.ticketToken}`;
+                                const text = util.format(
+                                    '%s-%s\n@%s\n%s',
+                                    moment(itemOffered.reservationFor.startDate).format('YYYY-MM-DD HH:mm'),
+                                    moment(itemOffered.reservationFor.endDate).format('HH:mm'),
+                                    // tslint:disable-next-line:max-line-length
+                                    `${itemOffered.reservationFor.superEvent.location.name.ja} ${itemOffered.reservationFor.location.name.ja}`,
+                                    // tslint:disable-next-line:max-line-length
+                                    `${itemOffered.reservedTicket.ticketedSeat.seatNumber} ${itemOffered.reservedTicket.coaTicketInfo.ticketName} ￥${itemOffered.reservedTicket.coaTicketInfo.salePrice}`
+                                );
+
+                                return {
+                                    thumbnailImageUrl: qr,
+                                    // imageBackgroundColor: '#000000',
+                                    title: itemOffered.reservationFor.name.ja,
+                                    // tslint:disable-next-line:max-line-length
+                                    text: text,
+                                    actions: [
+                                        {
+                                            type: 'postback',
+                                            label: 'チケット認証リクエスト',
+                                            data: `action=&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                        },
+                                        {
+                                            type: 'postback',
+                                            label: '飲食を注文する',
+                                            data: `action=orderMenuItems&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                        }
+                                    ]
+                                };
+                            }),
+                            imageAspectRatio: 'square'
+                            // imageAspectRatio: 'rectangle',
+                            // imageSize: 'cover'
+                        }
+                    }
+                ]
+            }
+        }).promise();
+    }
 }
 
 /**
