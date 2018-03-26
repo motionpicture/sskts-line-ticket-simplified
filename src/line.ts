@@ -3,6 +3,13 @@
  * @namespace line
  */
 
+export interface IProfile {
+    userId: string;
+    displayName: string;
+    pictureUrl: string;
+    statusMessage: string;
+}
+
 export interface IMessage {
     id: string;
     // tslint:disable-next-line:no-reserved-keywords
@@ -91,4 +98,16 @@ export async function getContent(messageId: string) {
         url: `https://api.line.me/v2/bot/message/${messageId}/content`,
         auth: { bearer: <string>process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN }
     }).promise();
+}
+
+/**
+ * LINEプロフィールを取得する
+ */
+export async function getProfile(userId: string): Promise<IProfile> {
+    return request.get({
+        simple: false,
+        url: `https://api.line.me/v2/bot/profile/${userId}`,
+        auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+        json: true
+    });
 }

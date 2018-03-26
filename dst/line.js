@@ -71,3 +71,17 @@ function getContent(messageId) {
     });
 }
 exports.getContent = getContent;
+/**
+ * LINEプロフィールを取得する
+ */
+function getProfile(userId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return request.get({
+            simple: false,
+            url: `https://api.line.me/v2/bot/profile/${userId}`,
+            auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+            json: true
+        });
+    });
+}
+exports.getProfile = getProfile;

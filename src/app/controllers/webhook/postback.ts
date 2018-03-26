@@ -374,15 +374,19 @@ export async function choosePaymentMethod(params: {
                 throw new Error('friendPayPrice undefined.');
             }
 
+            // 友達によって決済が済んでいるので何もしない
             price = params.friendPayPrice;
+            break;
 
         default:
             throw new Error(`Unknown payment method ${params.paymentMethod}`);
     }
 
+    // LINEプロフィールを連絡先に部分的に使用
+    const profile = await LINE.getProfile(params.user.userId);
     const contact = {
-        givenName: 'たろう',
-        familyName: 'もーしょん',
+        givenName: profile.displayName,
+        familyName: profile.userId,
         telephone: '+819012345678',
         email: 'hello@motionpicture.jp'
     };
