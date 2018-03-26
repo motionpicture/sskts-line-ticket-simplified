@@ -22,7 +22,6 @@ const customsearch = google.customsearch('v1');
 /**
  * 購入番号で取引を検索する
  * @export
- * @memberof app.controllers.webhook.postback
  */
 export async function searchTransactionByPaymentNo(userId: string, paymentNo: string, performanceDate: string) {
     await LINE.pushMessage(userId, `${performanceDate}-${paymentNo}の取引を検索しています...`);
@@ -32,8 +31,6 @@ export async function searchTransactionByPaymentNo(userId: string, paymentNo: st
 /**
  * 取引IDから取引情報詳細を送信する
  * @export
- * @function
- * @memberof app.controllers.webhook.postback
  * @param {string} userId LINEユーザーID
  * @param {string} transactionId 取引ID
  */
@@ -46,8 +43,6 @@ export async function searchTransactionByPaymentNo(userId: string, paymentNo: st
 /**
  * 日付でイベント検索
  * @export
- * @function
- * @memberof app.controllers.webhook.postback
  * @param {string} userId
  * @param {string} date YYYY-MM-DD形式
  */
@@ -150,8 +145,6 @@ export async function searchEventsByDate(user: User, date: string) {
 /**
  * 座席仮予約
  * @export
- * @function
- * @memberof app.controllers.webhook.postback
  */
 // tslint:disable-next-line:max-func-body-length
 export async function createTmpReservation(user: User, eventIdentifier: string) {
@@ -193,6 +186,16 @@ export async function createTmpReservation(user: User, eventIdentifier: string) 
         passportToken: passportToken
     });
     debug('transaction started.', transaction.id);
+
+    // 現時点でLINEユーザー情報を取引に連携する仕組みがapiにはないので、DBを直接編集する
+    const programMembership: any = {
+        membershipNumber: user.userId,
+        programName: 'LINE'
+    };
+    const transactionRepo = new sskts.repository.Transaction(sskts.mongoose.connection);
+    await transactionRepo.transactionModel.findByIdAndUpdate(transaction.id, {
+        'agent.memberOf': programMembership
+    }).exec();
 
     // 座席選択
 
@@ -470,6 +473,7 @@ export async function confirmOrder(user: User, transactionId: string) {
 ${order.customer.name}
 ${order.customer.telephone}
 ${order.customer.email}
+${(order.customer.memberOf !== undefined) ? `${order.customer.memberOf.programName}` : ''}
 ${(order.customer.memberOf !== undefined) ? `${order.customer.memberOf.membershipNumber}` : ''}
 --------------------
 座席予約
@@ -506,18 +510,32 @@ ${order.price}
                             const itemOffered = offer.itemOffered;
                             // tslint:disable-next-line:max-line-length
                             const qr = `https://chart.apis.google.com/chart?chs=300x300&cht=qr&chl=${itemOffered.reservedTicket.ticketToken}`;
+                            const text = util.format(
+                                '%s-%s\n@%s\n%s',
+                                moment(itemOffered.reservationFor.startDate).format('YYYY-MM-DD HH:mm'),
+                                moment(itemOffered.reservationFor.endDate).format('HH:mm'),
+                                // tslint:disable-next-line:max-line-length
+                                `${itemOffered.reservationFor.superEvent.location.name.ja} ${itemOffered.reservationFor.location.name.ja}`,
+                                // tslint:disable-next-line:max-line-length
+                                `${itemOffered.reservedTicket.ticketedSeat.seatNumber} ${itemOffered.reservedTicket.coaTicketInfo.ticketName} ￥${itemOffered.reservedTicket.coaTicketInfo.salePrice}`
+                            );
 
                             return {
                                 thumbnailImageUrl: qr,
                                 // imageBackgroundColor: '#000000',
                                 title: itemOffered.reservationFor.name.ja,
                                 // tslint:disable-next-line:max-line-length
-                                text: `${itemOffered.reservedTicket.ticketedSeat.seatNumber} ${itemOffered.reservedTicket.coaTicketInfo.ticketName} ￥${itemOffered.reservedTicket.coaTicketInfo.salePrice}`,
+                                text: text,
                                 actions: [
                                     {
                                         type: 'postback',
-                                        label: '???',
-                                        data: `action=selectTicket&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                        label: 'チケット認証リクエスト',
+                                        data: `action=&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                    },
+                                    {
+                                        type: 'postback',
+                                        label: '飲食を注文する',
+                                        data: `action=orderMenuItems&ticketToken=${itemOffered.reservedTicket.ticketToken}`
                                     }
                                 ]
                             };
@@ -608,8 +626,6 @@ export async function confirmFriendPay(user: User, friendPayToken: string, credi
 /**
  * 取引検索(csvダウンロード)
  * @export
- * @function
- * @memberof app.controllers.webhook.postback
  * @param {string} userId
  * @param {string} date YYYY-MM-DD形式
  */

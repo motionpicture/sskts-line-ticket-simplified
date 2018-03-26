@@ -140,8 +140,6 @@ export async function askConfirmationOfFriendPay(user: User, friendPayToken: str
 /**
  * 予約のイベント日選択を求める
  * @export
- * @function
- * @memberof app.controllers.webhook.message
  */
 export async function askReservationEventDate(userId: string, paymentNo: string) {
     await request.post(
@@ -185,8 +183,6 @@ export async function searchTickets(user: User) {
 /**
  * 日付選択を求める
  * @export
- * @function
- * @memberof app.controllers.webhook.message
  */
 export async function askEventStartDate(userId: string) {
     await request.post(
@@ -226,8 +222,6 @@ export async function askEventStartDate(userId: string) {
 /**
  * 日付選択を求める
  * @export
- * @function
- * @memberof app.controllers.webhook.message
  */
 export async function askFromWhenAndToWhen(userId: string) {
     // await LINE.pushMessage(userId, '期間をYYYYMMDD-YYYYMMDD形式で教えてください。');
@@ -265,8 +259,6 @@ export async function askFromWhenAndToWhen(userId: string) {
 /**
  * 取引CSVダウンロードURIを発行する
  * @export
- * @function
- * @memberof app.controllers.webhook.message
  */
 export async function publishURI4transactionsCSV(userId: string, dateFrom: string, dateThrough: string) {
     await LINE.pushMessage(userId, `${dateFrom} - ${dateThrough}の取引を検索しています...`);

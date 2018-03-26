@@ -152,8 +152,6 @@ exports.askConfirmationOfFriendPay = askConfirmationOfFriendPay;
 /**
  * 予約のイベント日選択を求める
  * @export
- * @function
- * @memberof app.controllers.webhook.message
  */
 function askReservationEventDate(userId, paymentNo) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -198,8 +196,6 @@ exports.searchTickets = searchTickets;
 /**
  * 日付選択を求める
  * @export
- * @function
- * @memberof app.controllers.webhook.message
  */
 function askEventStartDate(userId) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -238,8 +234,6 @@ exports.askEventStartDate = askEventStartDate;
 /**
  * 日付選択を求める
  * @export
- * @function
- * @memberof app.controllers.webhook.message
  */
 function askFromWhenAndToWhen(userId) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -276,8 +270,6 @@ exports.askFromWhenAndToWhen = askFromWhenAndToWhen;
 /**
  * 取引CSVダウンロードURIを発行する
  * @export
- * @function
- * @memberof app.controllers.webhook.message
  */
 function publishURI4transactionsCSV(userId, dateFrom, dateThrough) {
     return __awaiter(this, void 0, void 0, function* () {
