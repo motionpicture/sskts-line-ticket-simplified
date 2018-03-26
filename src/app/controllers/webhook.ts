@@ -138,6 +138,11 @@ export async function postback(event: LINE.IWebhookEvent, user: User) {
                 });
                 break;
 
+            // チケット認証リクエストを受信
+            case 'requestTicketAuthentication':
+                await PostbackController.requestTicketAuthentication(user, <string>data.ticketToken);
+                break;
+
             default:
         }
     } catch (error) {

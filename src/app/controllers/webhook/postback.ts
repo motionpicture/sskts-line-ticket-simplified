@@ -530,7 +530,7 @@ ${order.price}
                                     {
                                         type: 'postback',
                                         label: 'チケット認証リクエスト',
-                                        data: `action=&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                        data: `action=requestTicketAuthentication&ticketToken=${itemOffered.reservedTicket.ticketToken}`
                                     },
                                     {
                                         type: 'postback',
@@ -547,6 +547,78 @@ ${order.price}
             ]
         }
     }).promise();
+}
+
+export async function requestTicketAuthentication(user: User, ticketToken: string) {
+    await LINE.pushMessage(user.userId, 'チケット認証をリクエスト中...');
+
+    // 管理ユーザーに結果を送信
+    const adminUserId = process.env.ADMIN_USER_ID;
+    if (adminUserId === undefined) {
+        throw new Error('管理ユーザーIDが設定されていません。');
+    }
+
+    await LINE.pushMessage(adminUserId, 'チケット認証リクエストを受信しました。所有権を検索しています...');
+
+    const ownershipInfoRepo = new sskts.repository.OwnershipInfo(sskts.mongoose.connection);
+    const ownershipInfos = await ownershipInfoRepo.ownershipInfoModel.find({
+        'typeOfGood.reservedTicket.ticketToken': {
+            $exists: true,
+            $eq: ticketToken
+        }
+    }).exec().then((docs) => docs.map((doc) => <sskts.factory.ownershipInfo.IOwnershipInfo<any>>doc.toObject()));
+
+    await request.post({
+        simple: false,
+        url: 'https://api.line.me/v2/bot/message/push',
+        auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+        json: true,
+        body: {
+            to: adminUserId,
+            messages: [
+                {
+                    type: 'template',
+                    altText: 'this is a carousel template',
+                    template: {
+                        type: 'carousel',
+                        columns: ownershipInfos.map((ownershipInfo) => {
+                            const itemOffered = ownershipInfo.typeOfGood;
+                            // tslint:disable-next-line:max-line-length
+                            const qr = `https://chart.apis.google.com/chart?chs=300x300&cht=qr&chl=${itemOffered.reservedTicket.ticketToken}`;
+                            const text = util.format(
+                                '%s-%s\n@%s\n%s',
+                                moment(itemOffered.reservationFor.startDate).format('YYYY-MM-DD HH:mm'),
+                                moment(itemOffered.reservationFor.endDate).format('HH:mm'),
+                                // tslint:disable-next-line:max-line-length
+                                `${itemOffered.reservationFor.superEvent.location.name.ja} ${itemOffered.reservationFor.location.name.ja}`,
+                                // tslint:disable-next-line:max-line-length
+                                `${itemOffered.reservedTicket.ticketedSeat.seatNumber} ${itemOffered.reservedTicket.coaTicketInfo.ticketName} ￥${itemOffered.reservedTicket.coaTicketInfo.salePrice}`
+                            );
+
+                            return {
+                                thumbnailImageUrl: qr,
+                                // imageBackgroundColor: '#000000',
+                                title: itemOffered.reservationFor.name.ja,
+                                // tslint:disable-next-line:max-line-length
+                                text: text,
+                                actions: [
+                                    {
+                                        type: 'postback',
+                                        label: '認証確認リクエスト',
+                                        data: `action=&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                    }
+                                ]
+                            };
+                        }),
+                        imageAspectRatio: 'square'
+                        // imageSize: 'cover'
+                    }
+                }
+            ]
+        }
+    }).promise();
+
+    await LINE.pushMessage(user.userId, 'チケット認証をリクエストしました。');
 }
 
 /**

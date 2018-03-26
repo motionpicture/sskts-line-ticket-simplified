@@ -125,6 +125,10 @@ function postback(event, user) {
                         friendPayPrice: parseInt(data.price, 10)
                     });
                     break;
+                // チケット認証リクエストを受信
+                case 'requestTicketAuthentication':
+                    yield PostbackController.requestTicketAuthentication(user, data.ticketToken);
+                    break;
                 default:
             }
         }

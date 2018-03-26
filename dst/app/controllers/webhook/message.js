@@ -196,7 +196,7 @@ function searchTickets(user) {
             orderDate: { $gt: moment().add(-1, 'month').toDate() },
             'customer.memberOf.membershipNumber': {
                 $exists: true,
-                $eq: 'U28fba84b4008d60291fc861e2562b34f'
+                $eq: user.userId
             },
             'customer.memberOf.programName': {
                 $exists: true,
@@ -240,7 +240,7 @@ function searchTickets(user) {
                                             {
                                                 type: 'postback',
                                                 label: 'チケット認証リクエスト',
-                                                data: `action=&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                                data: `action=requestTicketAuthentication&ticketToken=${itemOffered.reservedTicket.ticketToken}`
                                             },
                                             {
                                                 type: 'postback',
