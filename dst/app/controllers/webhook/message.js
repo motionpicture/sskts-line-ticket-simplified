@@ -110,8 +110,12 @@ exports.startIndexingFace = startIndexingFace;
 /**
  * 友達決済承認確認
  */
-function askConfirmationOfFriendPay(user, token) {
+function askConfirmationOfFriendPay(user, friendPayToken) {
     return __awaiter(this, void 0, void 0, function* () {
+        const friendPayInfo = yield user.verifyFriendPayToken(friendPayToken);
+        const callback = `https://${user.host}/transactions/payment/friendPay/${friendPayToken}?userId=${user.userId}`;
+        // tslint:disable-next-line:max-line-length
+        const creditCardUrl = `https://${user.host}/transactions/${friendPayInfo.transactionId}/inputCreditCard?cb=${encodeURIComponent(callback)}`;
         yield request.post({
             simple: false,
             url: 'https://api.line.me/v2/bot/message/push',
@@ -128,14 +132,14 @@ function askConfirmationOfFriendPay(user, token) {
                             text: '本当に友達決済を承認しますか?',
                             actions: [
                                 {
-                                    type: 'postback',
+                                    type: 'uri',
                                     label: 'Yes',
-                                    data: `action=confirmFriendPay&token=${token}`
+                                    uri: creditCardUrl
                                 },
                                 {
                                     type: 'postback',
                                     label: 'No',
-                                    data: `action=rejectFriendPay&token=${token}`
+                                    data: `action=rejectFriendPay&token=${friendPayToken}`
                                 }
                             ]
                         }

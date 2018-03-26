@@ -258,7 +258,7 @@ export async function createTmpReservation(user: User, eventIdentifier: string) 
     debug('seatReservationAuthorization:', seatReservationAuthorization);
     await LINE.pushMessage(user.userId, `座席 ${selectedSeatCode} を確保しました。`);
 
-    const LINE_ID = '@qef9940v';
+    const LINE_ID = process.env.LINE_ID;
     const token = await user.signFriendPayInfo({
         transactionId: transaction.id,
         userId: user.userId,
@@ -338,7 +338,7 @@ export async function choosePaymentMethod(params: {
                 throw new Error('Credit card token not found.');
             }
 
-            await LINE.pushMessage(params.user.userId, 'オーソリを取得しています...');
+            await LINE.pushMessage(params.user.userId, 'クレジットカード情報を確認中です...');
 
             const actionRepo = new sskts.repository.Action(sskts.mongoose.connection);
             let seatReservations = await actionRepo.findAuthorizeByTransactionId(params.transactionId);
@@ -363,7 +363,7 @@ export async function choosePaymentMethod(params: {
                 creditCard: { token }
             });
             debug('creditCardAuthorizeAction:', creditCardAuthorizeAction);
-            await LINE.pushMessage(params.user.userId, 'クレジットカードのオーソリを取得しました。');
+            await LINE.pushMessage(params.user.userId, 'クレジットカード情報を確認できました。');
             break;
 
         case 'FriendPay':
@@ -517,6 +517,80 @@ ${order.price}
                         }),
                         imageAspectRatio: 'square'
                         // imageSize: 'cover'
+                    }
+                }
+            ]
+        }
+    }).promise();
+}
+
+/**
+ * 友達決済を承認確定
+ */
+export async function confirmFriendPay(user: User, friendPayToken: string, creditCardToken: string) {
+    const friendPayInfo = await user.verifyFriendPayToken(friendPayToken);
+
+    await LINE.pushMessage(user.userId, `${friendPayInfo.price}円の友達決済を受け付けます。`);
+    await LINE.pushMessage(user.userId, 'クレジットカード情報を確認中です...');
+
+    const placeOrderService = new ssktsapi.service.transaction.PlaceOrder({
+        endpoint: <string>process.env.API_ENDPOINT,
+        auth: user.authClient
+    });
+
+    const actionRepo = new sskts.repository.Action(sskts.mongoose.connection);
+    let seatReservations = await actionRepo.findAuthorizeByTransactionId(friendPayInfo.transactionId);
+    seatReservations = seatReservations
+        .filter((a) => a.actionStatus === ssktsapi.factory.actionStatusType.CompletedActionStatus)
+        .filter((a) => a.object.typeOf === ssktsapi.factory.action.authorize.seatReservation.ObjectType.SeatReservation);
+
+    const orderIdPrefix = util.format(
+        '%s%s%s',
+        moment().format('YYYYMMDD'),
+        '999',
+        // tslint:disable-next-line:no-magic-numbers
+        `00000000${seatReservations[0].result.updTmpReserveSeatResult.tmpReserveNum}`.slice(-8)
+    );
+
+    const creditCardAuthorizeAction = await placeOrderService.createCreditCardAuthorization({
+        transactionId: friendPayInfo.transactionId,
+        orderId: `${orderIdPrefix}01`,
+        amount: friendPayInfo.price,
+        method: sskts.GMO.utils.util.Method.Lump,
+        creditCard: { token: creditCardToken }
+    });
+    debug('creditCardAuthorizeAction:', creditCardAuthorizeAction);
+    await LINE.pushMessage(user.userId, 'クレジットカード情報を確認できました。');
+    await LINE.pushMessage(user.userId, '友達決済を承認しました。');
+
+    await request.post({
+        simple: false,
+        url: 'https://api.line.me/v2/bot/message/push',
+        auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+        json: true,
+        body: {
+            to: friendPayInfo.userId,
+            messages: [
+                {
+                    type: 'template',
+                    altText: 'This is a buttons template',
+                    template: {
+                        type: 'confirm',
+                        text: '友達決済の承認が確認できました。取引を続行しますか?',
+                        actions: [
+                            {
+                                type: 'postback',
+                                label: 'Yes',
+                                // tslint:disable-next-line:max-line-length
+                                data: `action=continueTransactionAfterFriendPayConfirmation&transactionId=${friendPayInfo.transactionId}&price=${friendPayInfo.price}`
+                            },
+                            {
+                                type: 'postback',
+                                label: 'No',
+                                // tslint:disable-next-line:max-line-length
+                                data: `action=cancelTransactionAfterFriendPayConfirmation&transactionId=${friendPayInfo.transactionId}&price=${friendPayInfo.price}`
+                            }
+                        ]
                     }
                 }
             ]

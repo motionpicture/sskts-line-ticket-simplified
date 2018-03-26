@@ -14,13 +14,14 @@ const debug = createDebug('sskts-line-ticket-simplified:router:transactions');
 
 transactionsRouter.get(
     '/transactions/:transactionId/inputCreditCard',
-    async (__, res, next) => {
+    async (req, res, next) => {
         try {
             const gmoShopId = 'tshop00026096';
 
             // フォーム
             res.render('transactions/inputCreditCard', {
-                gmoShopId: gmoShopId
+                gmoShopId: gmoShopId,
+                cb: req.query.cb // フォームのPOST先
             });
         } catch (error) {
             console.error(error);
@@ -28,6 +29,9 @@ transactionsRouter.get(
         }
     });
 
+/**
+ * 自分の取引のクレジットカード情報入力戻り先
+ */
 transactionsRouter.post(
     '/transactions/:transactionId/inputCreditCard',
     async (req, res, next) => {
@@ -59,6 +63,41 @@ transactionsRouter.post(
 </div>
 </body>
 </html>`
+            );
+        } catch (error) {
+            next(error);
+        }
+    });
+
+/**
+ * 友達によるクレジットカード情報入力からのコールバック
+ */
+transactionsRouter.post(
+    '/transactions/payment/friendPay/:friendPayToken',
+    async (req, res, next) => {
+        try {
+            debug('credit card token created.', req.body.token);
+
+            const user = new User({
+                host: req.hostname,
+                userId: req.query.userId,
+                state: req.query.state
+            });
+
+            // オーソリ取得
+            await PostbackController.confirmFriendPay(user, req.params.friendPayToken, req.body.token);
+
+            const location = 'line://';
+
+            res.send(`
+    <html>
+    <body onload="location.href='line://'">
+    <div style="text-align:center; font-size:400%">
+    <h1>クレジットカード情報入力完了</h1>
+    <a href="${location}">LINEに戻る</a>
+    </div>
+    </body>
+    </html>`
             );
         } catch (error) {
             next(error);
