@@ -70,6 +70,37 @@ transactionsRouter.post(
         }
     });
 
+transactionsRouter.post(
+    '/transactions/:transactionId/inputCreditCard/stub',
+    async (req, res, next) => {
+        try {
+            debug('credit card token created.', req.body.token);
+
+            const user = new User({
+                host: req.hostname,
+                userId: req.query.userId,
+                state: req.query.state
+            });
+
+            await PostbackController.askOrderConfirmation(user.userId, req.params.transactionId, true);
+
+            const location = 'line://';
+
+            res.send(`
+<html>
+<body onload="location.href='line://'">
+<div style="text-align:center; font-size:400%">
+<h1>クレジットカード情報入力完了</h1>
+<a href="${location}">取引を続ける</a>
+</div>
+</body>
+</html>`
+            );
+        } catch (error) {
+            next(error);
+        }
+    });
+
 /**
  * 友達によるクレジットカード情報入力からのコールバック
  */

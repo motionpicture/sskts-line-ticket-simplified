@@ -89,6 +89,44 @@ export async function showSeatReservationMenu(user: User) {
 }
 
 /**
+ * セミナー予約メニューを表示する
+ */
+export async function showSeminarMenu(user: User) {
+    await request.post({
+        simple: false,
+        url: 'https://api.line.me/v2/bot/message/push',
+        auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+        json: true,
+        body: {
+            to: user.userId,
+            messages: [
+                {
+                    type: 'template',
+                    altText: 'セミナー予約メニュー',
+                    template: {
+                        type: 'buttons',
+                        title: 'セミナー予約',
+                        text: 'ご用件はなんでしょう？',
+                        actions: [
+                            {
+                                type: 'postback',
+                                label: 'セミナーを予約する',
+                                data: 'action=startSeminarReservation'
+                            },
+                            {
+                                type: 'postback',
+                                label: 'セミナー予約を確認する',
+                                data: 'action=showSeminarTickets'
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }).promise();
+}
+
+/**
  * 顔写真登録を開始する
  */
 export async function startIndexingFace(userId: string) {

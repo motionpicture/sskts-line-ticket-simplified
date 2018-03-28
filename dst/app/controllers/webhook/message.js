@@ -99,6 +99,46 @@ function showSeatReservationMenu(user) {
 }
 exports.showSeatReservationMenu = showSeatReservationMenu;
 /**
+ * セミナー予約メニューを表示する
+ */
+function showSeminarMenu(user) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield request.post({
+            simple: false,
+            url: 'https://api.line.me/v2/bot/message/push',
+            auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+            json: true,
+            body: {
+                to: user.userId,
+                messages: [
+                    {
+                        type: 'template',
+                        altText: 'セミナー予約メニュー',
+                        template: {
+                            type: 'buttons',
+                            title: 'セミナー予約',
+                            text: 'ご用件はなんでしょう？',
+                            actions: [
+                                {
+                                    type: 'postback',
+                                    label: 'セミナーを予約する',
+                                    data: 'action=startSeminarReservation'
+                                },
+                                {
+                                    type: 'postback',
+                                    label: 'セミナー予約を確認する',
+                                    data: 'action=showSeminarTickets'
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }).promise();
+    });
+}
+exports.showSeminarMenu = showSeminarMenu;
+/**
  * 顔写真登録を開始する
  */
 function startIndexingFace(userId) {

@@ -47,6 +47,9 @@ function message(event, user) {
                         case /^座席予約追加$/.test(messageText):
                             yield MessageController.askEventStartDate(userId);
                             break;
+                        case /^セミナー予約$/.test(messageText):
+                            yield MessageController.showSeminarMenu(user);
+                            break;
                         case /^チケット$/.test(messageText):
                             yield MessageController.searchTickets(user);
                             break;
@@ -103,6 +106,10 @@ function postback(event, user) {
                 case 'createTmpReservation':
                     yield PostbackController.createTmpReservation(user, data.eventIdentifier);
                     break;
+                // セミナー仮予約
+                case 'createTmpSeminarReservation':
+                    yield PostbackController.createTmpSeminarReservation(user, data.eventId);
+                    break;
                 // 決済方法選択
                 case 'choosePaymentMethod':
                     yield PostbackController.choosePaymentMethod({
@@ -114,7 +121,7 @@ function postback(event, user) {
                     break;
                 // 注文確定
                 case 'confirmOrder':
-                    yield PostbackController.confirmOrder(user, data.transactionId);
+                    yield PostbackController.confirmOrder(user, data.transactionId, (data.isStub === '1'));
                     break;
                 // 友達決済承認確定
                 case 'continueTransactionAfterFriendPayConfirmation':
@@ -129,6 +136,12 @@ function postback(event, user) {
                 case 'requestTicketAuthentication':
                     yield PostbackController.requestTicketAuthentication(user, data.ticketToken);
                     break;
+                case 'startSeminarReservation':
+                    yield PostbackController.startSeminarReservation(user);
+                    break;
+                // case 'showSeminarTickets':
+                //     await PostbackController.showSeminarTickets(user);
+                //     break;
                 default:
             }
         }

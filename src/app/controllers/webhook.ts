@@ -48,6 +48,10 @@ export async function message(event: LINE.IWebhookEvent, user: User) {
                         await MessageController.askEventStartDate(userId);
                         break;
 
+                    case /^セミナー予約$/.test(messageText):
+                        await MessageController.showSeminarMenu(user);
+                        break;
+
                     case /^チケット$/.test(messageText):
                         await MessageController.searchTickets(user);
                         break;
@@ -113,6 +117,11 @@ export async function postback(event: LINE.IWebhookEvent, user: User) {
                 await PostbackController.createTmpReservation(user, <string>data.eventIdentifier);
                 break;
 
+            // セミナー仮予約
+            case 'createTmpSeminarReservation':
+                await PostbackController.createTmpSeminarReservation(user, <string>data.eventId);
+                break;
+
             // 決済方法選択
             case 'choosePaymentMethod':
                 await PostbackController.choosePaymentMethod({
@@ -125,7 +134,8 @@ export async function postback(event: LINE.IWebhookEvent, user: User) {
 
             // 注文確定
             case 'confirmOrder':
-                await PostbackController.confirmOrder(user, <string>data.transactionId);
+                await PostbackController.confirmOrder(
+                    user, <string>data.transactionId, (<string>data.isStub === '1'));
                 break;
 
             // 友達決済承認確定
@@ -142,6 +152,14 @@ export async function postback(event: LINE.IWebhookEvent, user: User) {
             case 'requestTicketAuthentication':
                 await PostbackController.requestTicketAuthentication(user, <string>data.ticketToken);
                 break;
+
+            case 'startSeminarReservation':
+                await PostbackController.startSeminarReservation(user);
+                break;
+
+            // case 'showSeminarTickets':
+            //     await PostbackController.showSeminarTickets(user);
+            //     break;
 
             default:
         }

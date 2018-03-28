@@ -33,6 +33,9 @@
 | `AWS_SECRET_ACCESS_KEY`            | true     |                                |                   |
 | `FACE_MATCH_THRESHOLD`             | true     |                                | 顔認証閾値             |
 | `LINE_ID`                          | true     |                                | LINEBotアプリケーションID |
+| `ADMIN_USER_ID`                    | true     |                                | 管理LINEユーザーID      |
+| `GOOGLE_CALENDAR_AUTH_KEY`         | true     |                                | Googleカレンダー認証キー   |
+| `GOOGLE_CALENDAR_ID`               | true     |                                | GoogleカレンダーID     |
 
 ## Code Samples
 

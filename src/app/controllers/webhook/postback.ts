@@ -11,6 +11,20 @@ import * as moment from 'moment';
 import * as request from 'request-promise-native';
 import * as util from 'util';
 
+const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
+const GOOGLE_CALENDAR_AUTH_KEY = process.env.GOOGLE_CALENDAR_AUTH_KEY;
+if (GOOGLE_CALENDAR_AUTH_KEY === undefined) {
+    throw new Error('GOOGLE_CALENDAR_AUTH_KEY undefined.');
+}
+const key = JSON.parse(GOOGLE_CALENDAR_AUTH_KEY);
+const jwtClient = new google.auth.JWT(
+    key.client_email,
+    undefined,
+    key.private_key,
+    ['https://www.googleapis.com/auth/calendar.readonly'],
+    undefined
+);
+
 import * as LINE from '../../../line';
 import User from '../../user';
 
@@ -140,6 +154,99 @@ export async function searchEventsByDate(user: User, date: string) {
             ]
         }
     }).promise();
+}
+
+/**
+ * セミナー予約開始
+ */
+// tslint:disable-next-line:max-func-body-length
+export async function startSeminarReservation(user: User) {
+    await LINE.pushMessage(user.userId, '近々のセミナーイベントを検索しています...');
+
+    const events: any[] = await new Promise<any[]>((resolve, reject) => {
+        jwtClient.authorize(async (authorizeErr: Error | null, credentials: any) => {
+            debug(authorizeErr, credentials);
+            if (authorizeErr instanceof Error) {
+                reject(authorizeErr);
+
+                return;
+            }
+
+            resolve(await listEvents(jwtClient));
+        });
+    });
+
+    await LINE.pushMessage(user.userId, `${events.length}件のイベントがみつかりました。`);
+
+    await request.post({
+        simple: false,
+        url: 'https://api.line.me/v2/bot/message/push',
+        auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+        json: true,
+        body: {
+            to: user.userId,
+            messages: [
+                {
+                    type: 'template',
+                    altText: 'events',
+                    template: {
+                        type: 'carousel',
+                        columns: events.map((event) => {
+                            let text = `${event.start.dateTime || event.start.date}`;
+                            if (typeof event.description === 'string') {
+                                // tslint:disable-next-line:no-magic-numbers
+                                text += `\n${event.description.substr(0, 30)}...`;
+                            }
+
+                            return {
+                                // tslint:disable-next-line:max-line-length no-http-string
+                                // thumbnailImageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrhpsOJOcLBwc1SPD9sWlinildy4S05-I2Wf6z2wRXnSxbmtRz',
+                                imageBackgroundColor: '#000000',
+                                title: event.summary,
+                                text: text,
+                                actions: [
+                                    {
+                                        type: 'postback',
+                                        label: '予約開始',
+                                        data: `action=createTmpSeminarReservation&eventId=${event.id}`
+                                    }
+                                ]
+                            };
+                        })
+                        // imageAspectRatio: 'rectangle',
+                        // imageSize: 'cover'
+                    }
+                }
+            ]
+        }
+    }).promise();
+}
+
+/**
+ * Lists the next 10 events on the user's primary calendar.
+ * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
+ */
+async function listEvents(auth: any) {
+    const calendar = google.calendar({ version: 'v3', auth });
+
+    return new Promise<any[]>((resolve, reject) => {
+        calendar.events.list(
+            {
+                calendarId: GOOGLE_CALENDAR_ID,
+                timeMin: (new Date()).toISOString(),
+                maxResults: 10,
+                singleEvents: true,
+                orderBy: 'startTime'
+            },
+            (err: any, response: any) => {
+                console.error(err, response);
+                if (err instanceof Error) {
+                    reject(err);
+                } else {
+                    resolve(response.data.items);
+                }
+            });
+    });
 }
 
 /**
@@ -316,6 +423,65 @@ line://oaMessage/${LINE_ID}/?${friendMessage}`);
     }).promise();
 }
 
+/**
+ * セミナー仮予約
+ */
+// tslint:disable-next-line:max-func-body-length
+export async function createTmpSeminarReservation(user: User, __: string) {
+    await LINE.pushMessage(user.userId, '空席状況を確認しています...');
+
+    const transactionId = 'transactionId';
+    const price = 1000;
+    const LINE_ID = process.env.LINE_ID;
+    const token = await user.signFriendPayInfo({
+        transactionId: transactionId,
+        userId: user.userId,
+        price: price
+    });
+    const friendMessage = `FriendPayToken.${token}`;
+    const message = encodeURIComponent(`僕の代わりに決済をお願いできますか？よければ、下のリンクを押してそのままメッセージを送信してください。
+line://oaMessage/${LINE_ID}/?${friendMessage}`);
+    const friendPayUrl = `line://msg/text/?${message}`;
+
+    const gmoShopId = 'tshop00026096';
+    const creditCardCallback = `https://${user.host}/transactions/${transactionId}/inputCreditCard/stub?userId=${user.userId}`;
+    // tslint:disable-next-line:max-line-length
+    const creditCardUrl = `https://${user.host}/transactions/inputCreditCard?cb=${encodeURIComponent(creditCardCallback)}&gmoShopId=${gmoShopId}`;
+
+    await request.post({
+        simple: false,
+        url: 'https://api.line.me/v2/bot/message/push',
+        auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+        json: true,
+        body: {
+            to: user.userId,
+            messages: [
+                {
+                    type: 'template',
+                    altText: 'This is a buttons template',
+                    template: {
+                        type: 'buttons',
+                        title: '決済方法選択',
+                        text: '決済方法を選択してください。Friend Payの場合、ボタンを押して友達を選択してください。',
+                        actions: [
+                            {
+                                type: 'uri',
+                                label: 'Credit Card',
+                                uri: creditCardUrl
+                            },
+                            {
+                                type: 'uri',
+                                label: 'Friend Pay',
+                                uri: friendPayUrl
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }).promise();
+}
+
 export type PaymentMethodType = 'CreditCard' | 'Pecorino' | 'FriendPay';
 
 // tslint:disable-next-line:max-func-body-length
@@ -414,13 +580,20 @@ ${price} JPY
 `);
 
     // 注文内容確認
+    await askOrderConfirmation(params.user.userId, params.transactionId, false);
+}
+
+export async function askOrderConfirmation(userId: string, transactionId: string, isStub: boolean) {
+    const stub = (isStub) ? 1 : 0;
+
+    // 注文内容確認
     await request.post({
         simple: false,
         url: 'https://api.line.me/v2/bot/message/push',
         auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
         json: true,
         body: {
-            to: params.user.userId,
+            to: userId,
             messages: [
                 {
                     type: 'template',
@@ -432,12 +605,12 @@ ${price} JPY
                             {
                                 type: 'postback',
                                 label: 'Yes',
-                                data: `action=confirmOrder&transactionId=${params.transactionId}`
+                                data: `action=confirmOrder&transactionId=${transactionId}&isStub=${stub}`
                             },
                             {
                                 type: 'postback',
                                 label: 'No',
-                                data: `action=cancelOrder&transactionId=${params.transactionId}`
+                                data: `action=cancelOrder&transactionId=${transactionId}&isStub=${stub}`
                             }
                         ]
                     }
@@ -447,106 +620,145 @@ ${price} JPY
     }).promise();
 }
 
-export async function confirmOrder(user: User, transactionId: string) {
+// tslint:disable-next-line:max-func-body-length
+export async function confirmOrder(user: User, transactionId: string, isStub: boolean) {
     await LINE.pushMessage(user.userId, '注文を確定しています...');
 
-    const placeOrderService = new ssktsapi.service.transaction.PlaceOrder({
-        endpoint: <string>process.env.API_ENDPOINT,
-        auth: user.authClient
-    });
-    const order = await placeOrderService.confirm({
-        transactionId: transactionId
-    });
-    const event = order.acceptedOffers[0].itemOffered.reservationFor;
-    const reservedTickets = order.acceptedOffers.map(
-        // tslint:disable-next-line:max-line-length
-        (orderItem) => `${orderItem.itemOffered.reservedTicket.ticketedSeat.seatNumber} ${orderItem.itemOffered.reservedTicket.coaTicketInfo.ticketName} ￥${orderItem.itemOffered.reservedTicket.coaTicketInfo.salePrice}`
-    ).join('\n');
-
-    const orderDetails = `--------------------
-注文内容
---------------------
-予約番号: ${order.confirmationNumber}
---------------------
-購入者情報
---------------------
-${order.customer.name}
-${order.customer.telephone}
-${order.customer.email}
-${(order.customer.memberOf !== undefined) ? `${order.customer.memberOf.programName}` : ''}
-${(order.customer.memberOf !== undefined) ? `${order.customer.memberOf.membershipNumber}` : ''}
---------------------
-座席予約
---------------------
-${order.acceptedOffers[0].itemOffered.reservationFor.name.ja}
-${moment(event.startDate).format('YYYY-MM-DD HH:mm')}-${moment(event.endDate).format('HH:mm')}
-@${event.superEvent.location.name.ja} ${event.location.name.ja}
-${reservedTickets}
---------------------
-決済方法
---------------------
-${order.paymentMethods.map((p) => p.paymentMethod).join(' ')}
-${order.price}
---------------------
-割引
---------------------
-`;
-    await LINE.pushMessage(user.userId, orderDetails);
-
-    await request.post({
-        simple: false,
-        url: 'https://api.line.me/v2/bot/message/push',
-        auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
-        json: true,
-        body: {
-            to: user.userId,
-            messages: [
-                {
-                    type: 'template',
-                    altText: 'this is a carousel template',
-                    template: {
-                        type: 'carousel',
-                        columns: order.acceptedOffers.map((offer) => {
-                            const itemOffered = offer.itemOffered;
-                            // tslint:disable-next-line:max-line-length
-                            const qr = `https://chart.apis.google.com/chart?chs=300x300&cht=qr&chl=${itemOffered.reservedTicket.ticketToken}`;
-                            const text = util.format(
-                                '%s-%s\n@%s\n%s',
-                                moment(itemOffered.reservationFor.startDate).format('YYYY-MM-DD HH:mm'),
-                                moment(itemOffered.reservationFor.endDate).format('HH:mm'),
-                                // tslint:disable-next-line:max-line-length
-                                `${itemOffered.reservationFor.superEvent.location.name.ja} ${itemOffered.reservationFor.location.name.ja}`,
-                                // tslint:disable-next-line:max-line-length
-                                `${itemOffered.reservedTicket.ticketedSeat.seatNumber} ${itemOffered.reservedTicket.coaTicketInfo.ticketName} ￥${itemOffered.reservedTicket.coaTicketInfo.salePrice}`
-                            );
-
-                            return {
+    if (isStub) {
+        const qr = 'https://chart.apis.google.com/chart?chs=300x300&cht=qr&chl=token';
+        await request.post({
+            simple: false,
+            url: 'https://api.line.me/v2/bot/message/push',
+            auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+            json: true,
+            body: {
+                to: user.userId,
+                messages: [
+                    {
+                        type: 'template',
+                        altText: 'this is a carousel template',
+                        template: {
+                            type: 'carousel',
+                            columns: [{
                                 thumbnailImageUrl: qr,
                                 // imageBackgroundColor: '#000000',
-                                title: itemOffered.reservationFor.name.ja,
+                                title: 'event title',
                                 // tslint:disable-next-line:max-line-length
-                                text: text,
+                                text: 'event text',
                                 actions: [
                                     {
                                         type: 'postback',
                                         label: 'チケット認証リクエスト',
-                                        data: `action=requestTicketAuthentication&ticketToken=${itemOffered.reservedTicket.ticketToken}`
-                                    },
-                                    {
-                                        type: 'postback',
-                                        label: '飲食を注文する',
-                                        data: `action=orderMenuItems&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                        data: 'action=requestTicketAuthentication&ticketToken=token'
                                     }
                                 ]
-                            };
-                        }),
-                        imageAspectRatio: 'square'
-                        // imageSize: 'cover'
+                            }],
+                            imageAspectRatio: 'square'
+                            // imageSize: 'cover'
+                        }
                     }
-                }
-            ]
-        }
-    }).promise();
+                ]
+            }
+        }).promise();
+    } else {
+        const placeOrderService = new ssktsapi.service.transaction.PlaceOrder({
+            endpoint: <string>process.env.API_ENDPOINT,
+            auth: user.authClient
+        });
+        const order = await placeOrderService.confirm({
+            transactionId: transactionId
+        });
+        const event = order.acceptedOffers[0].itemOffered.reservationFor;
+        const reservedTickets = order.acceptedOffers.map(
+            // tslint:disable-next-line:max-line-length
+            (orderItem) => `${orderItem.itemOffered.reservedTicket.ticketedSeat.seatNumber} ${orderItem.itemOffered.reservedTicket.coaTicketInfo.ticketName} ￥${orderItem.itemOffered.reservedTicket.coaTicketInfo.salePrice}`
+        ).join('\n');
+
+        const orderDetails = `--------------------
+    注文内容
+    --------------------
+    予約番号: ${order.confirmationNumber}
+    --------------------
+    購入者情報
+    --------------------
+    ${order.customer.name}
+    ${order.customer.telephone}
+    ${order.customer.email}
+    ${(order.customer.memberOf !== undefined) ? `${order.customer.memberOf.programName}` : ''}
+    ${(order.customer.memberOf !== undefined) ? `${order.customer.memberOf.membershipNumber}` : ''}
+    --------------------
+    座席予約
+    --------------------
+    ${order.acceptedOffers[0].itemOffered.reservationFor.name.ja}
+    ${moment(event.startDate).format('YYYY-MM-DD HH:mm')}-${moment(event.endDate).format('HH:mm')}
+    @${event.superEvent.location.name.ja} ${event.location.name.ja}
+    ${reservedTickets}
+    --------------------
+    決済方法
+    --------------------
+    ${order.paymentMethods.map((p) => p.paymentMethod).join(' ')}
+    ${order.price}
+    --------------------
+    割引
+    --------------------
+    `;
+        await LINE.pushMessage(user.userId, orderDetails);
+
+        await request.post({
+            simple: false,
+            url: 'https://api.line.me/v2/bot/message/push',
+            auth: { bearer: process.env.LINE_BOT_CHANNEL_ACCESS_TOKEN },
+            json: true,
+            body: {
+                to: user.userId,
+                messages: [
+                    {
+                        type: 'template',
+                        altText: 'this is a carousel template',
+                        template: {
+                            type: 'carousel',
+                            columns: order.acceptedOffers.map((offer) => {
+                                const itemOffered = offer.itemOffered;
+                                // tslint:disable-next-line:max-line-length
+                                const qr = `https://chart.apis.google.com/chart?chs=300x300&cht=qr&chl=${itemOffered.reservedTicket.ticketToken}`;
+                                const text = util.format(
+                                    '%s-%s\n@%s\n%s',
+                                    moment(itemOffered.reservationFor.startDate).format('YYYY-MM-DD HH:mm'),
+                                    moment(itemOffered.reservationFor.endDate).format('HH:mm'),
+                                    // tslint:disable-next-line:max-line-length
+                                    `${itemOffered.reservationFor.superEvent.location.name.ja} ${itemOffered.reservationFor.location.name.ja}`,
+                                    // tslint:disable-next-line:max-line-length
+                                    `${itemOffered.reservedTicket.ticketedSeat.seatNumber} ${itemOffered.reservedTicket.coaTicketInfo.ticketName} ￥${itemOffered.reservedTicket.coaTicketInfo.salePrice}`
+                                );
+
+                                return {
+                                    thumbnailImageUrl: qr,
+                                    // imageBackgroundColor: '#000000',
+                                    title: itemOffered.reservationFor.name.ja,
+                                    // tslint:disable-next-line:max-line-length
+                                    text: text,
+                                    actions: [
+                                        {
+                                            type: 'postback',
+                                            label: 'チケット認証リクエスト',
+                                            data: `action=requestTicketAuthentication&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                        },
+                                        {
+                                            type: 'postback',
+                                            label: '飲食を注文する',
+                                            data: `action=orderMenuItems&ticketToken=${itemOffered.reservedTicket.ticketToken}`
+                                        }
+                                    ]
+                                };
+                            }),
+                            imageAspectRatio: 'square'
+                            // imageSize: 'cover'
+                        }
+                    }
+                ]
+            }
+        }).promise();
+    }
 }
 
 export async function requestTicketAuthentication(user: User, ticketToken: string) {

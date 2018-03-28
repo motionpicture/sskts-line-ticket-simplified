@@ -20,7 +20,7 @@
     "ejs": "^2.5.8",
     "express": "^4.16.2",
     "express-session": "^1.15.6",
-    "googleapis": "^26.0.1",
+    "googleapis": "^27.0.0",
     "http-status": "^1.0.1",
     "ioredis": "^3.2.2",
     "jsonwebtoken": "^8.1.1",
